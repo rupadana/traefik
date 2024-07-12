@@ -1,0 +1,47 @@
+version: '3'
+
+services:
+  traefik:
+    # The official v3 Traefik docker image
+    image: traefik:v3.0
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The HTTP Secure Port
+      - "443:443"
+    command:
+      - "--configFile=/config/traefik.yaml"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - ./ssl:/ssl-certs
+      - ./config:/config
+      - /etc/localtime:/etc/localtime
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment: 
+      - TZ=${TZ}
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
+      - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.codecrafters.id`)"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.ssl-header.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.traefik.middlewares=https-redirect"
+      
+      - "traefik.http.routers.traefik-secure.entrypoints=websecure"
+      - "traefik.http.routers.traefik-secure.rule=Host(`traefik.codecrafters.id`)"
+      - "traefik.http.routers.traefik-secure.tls=true"
+      - "traefik.http.routers.traefik-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.traefik-secure.tls.domains[0].main=codecrafters.id"
+      - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.codecrafters.id"
+      - "traefik.http.routers.traefik-secure.service=api@internal"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+    
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
